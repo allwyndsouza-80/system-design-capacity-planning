@@ -19,11 +19,8 @@
 
         <!-- HEADER -->
         <div class="header">
-            <div class="header-top">
-                <div class="header-badge"><span class="pulse"></span>Capacity Planner</div>
-                <span class="header-version">v2.0.0</span>
-            </div>
-            <h1>System Design <span>Capacity</span> Planner</h1>
+
+            <h1>System <span>Capacity</span> Planner</h1>
             <p class="header-sub">Fill in the numbers below and hit Calculate. The tool will tell you how many requests
                 per second your system needs to handle, how much storage you will need, and what infrastructure to use.
             </p>
@@ -51,8 +48,6 @@
                         <button onclick="setDau(1e4)" class="scut">10K</button>
                         <button onclick="setDau(1e5)" class="scut">100K</button>
                         <button onclick="setDau(1e6)" class="scut">1M</button>
-                        <button onclick="setDau(1e8)" class="scut">100M</button>
-                        <button onclick="setDau(1e9)" class="scut">1B</button>
                     </div>
                 </div>
 
@@ -65,10 +60,10 @@
                     </div>
                     <input type="number" id="actions" value="10" min="1">
                     <div class="shortcut-row">
-                        <button onclick="setActions(10)" class="scut">10</button>
-                        <button onclick="setActions(100)" class="scut">100</button>
                         <button onclick="setActions(1000)" class="scut">1K</button>
                         <button onclick="setActions(1e4)" class="scut">10K</button>
+                        <button onclick="setActions(1e5)" class="scut">100K</button>
+                        <button onclick="setActions(1e6)" class="scut">1M</button>
                     </div>
                 </div>
 
