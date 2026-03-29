@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Design Capacity Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="./index.css">
+</head>
+
+<body>
+
+    <div class="wrapper">
+
+        <!-- HEADER -->
+        <div class="header">
+            <div class="header-top">
+                <div class="header-badge"><span class="pulse"></span>Capacity Planner</div>
+                <span class="header-version">v2.0.0</span>
+            </div>
+            <h1>System Design <span>Capacity</span> Planner</h1>
+            <p class="header-sub">Fill in the numbers below and hit Calculate. The tool will tell you how many requests
+                per second your system needs to handle, how much storage you will need, and what infrastructure to use.
+            </p>
+        </div>
+
+        <!-- STEP 1: INPUTS -->
+        <div class="section-label">Step 1 — Tell us about your users</div>
+        <div class="input-grid">
+
+            <!-- LEFT CARD -->
+            <div class="card">
+                <div class="section-label" style="font-size:9px;margin-bottom:0.9rem">Who uses your app?</div>
+
+                <div class="field">
+                    <div class="field-label">
+                        How many people use your app every day?
+                        <span class="tip">i<span class="tip-popup">Called "DAU" (Daily Active Users). Example: 1,000,000
+                                means one million people open your app today. Every other calculation starts from this
+                                number.</span></span>
+                    </div>
+                    <input type="number" id="dau" value="1000000" min="1">
+                    <span class="dau-preview" id="dau-preview">= 1M users / day</span>
+                    <div class="shortcut-row">
+                        <button onclick="setDau(1e3)" class="scut">1K</button>
+                        <button onclick="setDau(1e4)" class="scut">10K</button>
+                        <button onclick="setDau(1e5)" class="scut">100K</button>
+                        <button onclick="setDau(1e6)" class="scut">1M</button>
+                        <button onclick="setDau(1e8)" class="scut">100M</button>
+                        <button onclick="setDau(1e9)" class="scut">1B</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <div class="field-label">
+                        How many times does one user tap or click per day?
+                        <span class="tip">i<span class="tip-popup">Each tap = one request to your server. Example: user
+                                opens app, scrolls feed 5 times, posts a photo, likes 3 things = about 10 actions. This
+                                gets multiplied by all users to find your total daily server load.</span></span>
+                    </div>
+                    <input type="number" id="actions" value="10" min="1">
+                    <div class="shortcut-row">
+                        <button onclick="setActions(10)" class="scut">10</button>
+                        <button onclick="setActions(100)" class="scut">100</button>
+                        <button onclick="setActions(1000)" class="scut">1K</button>
+                        <button onclick="setActions(1e4)" class="scut">10K</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <div class="field-label">
+                        How much busier does it get at rush hour?
+                        <span class="tip">i<span class="tip-popup">Traffic is never even all day. At lunch or evenings
+                                your app may get 5x more traffic than the average. This multiplier helps you plan for
+                                the worst-case spike. Most apps use 3–5x. A live event or ticketing app might need
+                                10–20x.</span></span>
+                    </div>
+                    <div class="field-hint">5x means at peak it is 5 times busier than the daily average</div>
+                    <div class="slider-wrap">
+                        <input type="range" id="multiplier" min="1" max="20" step="1" value="5">
+                        <span class="slider-val" id="mult-out">5×</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT CARD -->
+            <div class="card">
+                <div class="section-label" style="font-size:9px;margin-bottom:0.9rem">What does your app do with data?
+                </div>
+
+                <div class="field">
+                    <div class="field-label">
+                        What % of requests are users <em style="color:#60a5fa">loading</em> something?
+                        <span class="tip">i<span class="tip-popup">A "read" = loading or viewing data. Scrolling a feed,
+                                searching, opening a profile page — all reads. They hit your database or cache to fetch
+                                data. Most apps are 70–90% reads.</span></span>
+                    </div>
+                    <div class="field-hint">Loading a page, viewing a profile, searching = reading data</div>
+                    <div class="slider-wrap">
+                        <input type="range" id="readpct" min="0" max="100" step="1" value="60">
+                        <span class="slider-val" id="read-out">60%</span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <div class="field-label">
+                        What % of requests are users <em style="color:var(--amber)">saving</em> something?
+                        <span class="tip">i<span class="tip-popup">A "write" = creating or changing data. Posting,
+                                liking, buying, commenting — all writes. Note: these can overlap with reads! Viewing a
+                                post can also write a view count. That is why both sliders are independent
+                                here.</span></span>
+                    </div>
+                    <div class="field-hint">Posting, liking, buying, commenting = writing data</div>
+                    <div class="slider-wrap">
+                        <input type="range" id="writepct" min="0" max="100" step="1" value="60">
+                        <span class="slider-val" id="write-out">60%</span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <div class="field-label">
+                        How big is one request or response? (KB)
+                        <span class="tip">i<span class="tip-popup">Every server response has a size. A small JSON reply
+                                is 1–5 KB. A feed page with images can be 50–200 KB. This is used to calculate how much
+                                storage space you will fill up over time.</span></span>
+                    </div>
+                    <div class="field-hint">Average data size per request in kilobytes — e.g. 10 KB</div>
+                    <input type="number" id="payload" value="10" min="0.1" step="0.1">
+                </div>
+
+                <div class="field">
+                    <div class="field-label">
+                        How many days should data be kept?
+                        <span class="tip">i<span class="tip-popup">How long before old data is deleted or archived. 365
+                                = keep one year of data. The longer you keep it, the more storage you need. This
+                                directly multiplies your daily storage growth.</span></span>
+                    </div>
+                    <div class="field-hint">365 = keep one year of data before archiving</div>
+                    <input type="number" id="retention" value="365" min="1">
+                </div>
+            </div>
+        </div>
+
+        <button class="calc-btn" id="calc-btn">&#9654; &nbsp; Calculate — Show Me the Numbers</button>
+
+        <!-- RESULTS -->
+        <div class="results hidden" id="results">
+            <hr class="divider">
+
+            <!-- STEP 2: RPS -->
+            <div class="section-label">
+                Step 2 — How many requests per second does your server get?
+                <span class="tip" style="margin-left:4px">i<span class="tip-popup">RPS = Requests Per Second. This is
+                        the most important number in system design. It tells you how fast your servers need to work.
+                        Average RPS = normal quiet load. Peak RPS = worst-case burst you must plan for.</span></span>
+            </div>
+
+            <div class="formula-bar" id="formula-bar"></div>
+
+            <div class="metric-grid">
+                <div class="metric">
+                    <div class="m-label">Total clicks per day</div>
+                    <div class="m-value" id="r-total">—</div>
+                    <div class="m-unit">requests / day</div>
+                    <div class="m-explain">= daily users × clicks per user</div>
+                </div>
+                <div class="metric">
+                    <div class="m-label">Normal speed</div>
+                    <div class="m-value" id="r-avg">—</div>
+                    <div class="m-unit">requests / second (average)</div>
+                    <div class="m-explain">on a quiet, ordinary moment</div>
+                </div>
+                <div class="metric blue">
+                    <div class="m-label">⚡ Worst-case speed (peak)</div>
+                    <div class="m-value" id="r-peak">—</div>
+                    <div class="m-unit">requests / second</div>
+                    <div class="m-explain">design your servers for this number</div>
+                </div>
+                <div class="metric">
+                    <div class="m-label">Rush hour is this much busier</div>
+                    <div class="m-value" id="r-mult">—</div>
+                    <div class="m-unit">times normal speed</div>
+                    <div class="m-explain">your peak multiplier setting</div>
+                </div>
+            </div>
+
+            <!-- STEP 3: READ vs WRITE -->
+            <div class="section-label" style="margin-top:1.5rem">
+                Step 3 — How hard is your database being hit? (loads vs. saves at peak)
+            </div>
+
+            <div class="db-load-bar">
+                <div>
+                    <div class="db-load-label">Total database operations per second</div>
+                    <div class="db-load-value" id="db-total-ops">—</div>
+                </div>
+                <div class="db-load-note" id="db-load-note">—</div>
+            </div>
+
+            <div class="rw-grid">
+                <div class="rw-card">
+                    <div class="m-label" style="color:#60a5fa">Load requests per second (reads)</div>
+                    <div class="rw-number" style="color:#60a5fa" id="r-reads">—</div>
+                    <div class="rw-explain" id="r-reads-explain">—</div>
+                    <div class="rw-track">
+                        <div class="rw-fill" id="read-fill" style="background:#3b82f6"></div>
+                    </div>
+                </div>
+                <div class="rw-card">
+                    <div class="m-label" style="color:var(--amber)">Save requests per second (writes)</div>
+                    <div class="rw-number" style="color:var(--amber)" id="r-writes">—</div>
+                    <div class="rw-explain" id="r-writes-explain">—</div>
+                    <div class="rw-track">
+                        <div class="rw-fill" id="write-fill" style="background:var(--amber)"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 4: STORAGE -->
+            <div class="section-label" style="margin-top:1.5rem">
+                Step 4 — How much disk space will you need?
+            </div>
+
+            <div class="storage-grid">
+                <div class="metric green">
+                    <div class="m-label">New data added every day</div>
+                    <div class="m-value" id="r-daily-storage">—</div>
+                    <div class="m-unit" id="r-daily-unit">— / day</div>
+                    <div class="m-explain">= total daily requests × size per request</div>
+                </div>
+                <div class="metric amber">
+                    <div class="m-label">Total storage needed</div>
+                    <div class="m-value" id="r-total-storage">—</div>
+                    <div class="m-unit" id="r-total-unit">—</div>
+                    <div class="m-explain">= daily growth × number of days you keep data</div>
+                </div>
+            </div>
+
+            <!-- STEP 5: RECOMMENDATIONS -->
+            <div class="section-label" style="margin-top:1.5rem">
+                Step 5 — What infrastructure should you build?
+            </div>
+            <div class="recs-card">
+                <div class="recs-header">Based on your numbers, here is what your system needs</div>
+                <div id="r-recs"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const $ = id => document.getElementById(id);
+
+        $('dau').addEventListener('input', () => {
+            $('dau-preview').textContent = '= ' + fmt(+$('dau').value) + ' users / day';
+        });
+
+        $('multiplier').addEventListener('input', () => {
+            $('mult-out').textContent = $('multiplier').value + '×';
+        });
+
+        $('readpct').addEventListener('input', () => {
+            $('read-out').textContent = $('readpct').value + '%';
+        });
+
+        $('writepct').addEventListener('input', () => {
+            $('write-out').textContent = $('writepct').value + '%';
+        });
+
+        function setDau(val) {
+            $('dau').value = val;
+            $('dau-preview').textContent = '= ' + fmt(val) + ' users / day';
+        }
+
+        function setActions(val) {
+            $('actions').value = val;
+        }
+
+        function fmt(n) {
+            if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+            if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+            if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+            if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+            if (n >= 10) return Math.round(n).toString();
+            return n.toFixed(1);
+        }
+
+        function fmtStorage(bytes) {
+            if (bytes >= 1e15) return [(bytes / 1e15).toFixed(2), 'PB'];
+            if (bytes >= 1e12) return [(bytes / 1e12).toFixed(2), 'TB'];
+            if (bytes >= 1e9) return [(bytes / 1e9).toFixed(2), 'GB'];
+            if (bytes >= 1e6) return [(bytes / 1e6).toFixed(2), 'MB'];
+            return [(bytes / 1e3).toFixed(2), 'KB'];
+        }
+
+        function buildRecs(peakRPS, readPct, writePct, readRPS, writeRPS, dailyBytes, totalBytes, dau) {
+            const recs = [];
+
+            if (peakRPS > 10000) {
+                recs.push({ cls: 'tag-red', tag: 'CRITICAL SCALE', text: `<strong>Your peak of ${fmt(peakRPS)} requests/sec is very high — one server cannot handle this.</strong> You need many servers spread across multiple data centers worldwide. Use a global load balancer (AWS Route53 + ALB, or Cloudflare) to send each user to the nearest server. Also look into a service mesh like Istio to manage traffic between your servers.` });
+            } else if (peakRPS > 1000) {
+                recs.push({ cls: 'tag-amber', tag: 'LOAD BALANCER', text: `<strong>Your peak of ${fmt(peakRPS)} requests/sec is too high for one server.</strong> Add a Load Balancer — think of it as a traffic cop that splits incoming requests across multiple servers. Use NGINX, HAProxy, or your cloud provider's option (AWS ALB, GCP Load Balancer). Set up auto-scaling so extra servers turn on automatically when traffic spikes.` });
+            } else if (peakRPS > 100) {
+                recs.push({ cls: 'tag-blue', tag: 'SCALE UP', text: `<strong>Your peak of ${fmt(peakRPS)} requests/sec is moderate — one powerful server can handle this for now.</strong> Put NGINX in front of it as a reverse proxy (it handles SSL, compression, and connection pooling). Start preparing your auto-scaling setup so you are ready when traffic grows.` });
+            } else {
+                recs.push({ cls: 'tag-green', tag: 'SINGLE SERVER', text: `<strong>Your peak of ${fmt(peakRPS)} requests/sec is low — one server is more than enough.</strong> Focus on writing clean code, adding logging, and setting up basic monitoring. You have plenty of room to grow before needing any scaling.` });
+            }
+
+            if (readPct >= 0.7) {
+                recs.push({ cls: 'tag-blue', tag: 'ADD A CACHE', text: `<strong>${Math.round(readPct * 100)}% of your requests are users loading data.</strong> Instead of asking your database every single time, add a cache like Redis or Memcached. It keeps popular answers in memory so they come back instantly without touching the database. Aim for 90%+ of read requests to be answered by the cache.` });
+            }
+
+            if (readPct >= 0.7 && peakRPS > 200) {
+                recs.push({ cls: 'tag-purple', tag: 'DATABASE COPIES', text: `<strong>High load — ${fmt(readRPS)} load requests/sec.</strong> One database server will struggle. Use replication: one main database handles all saves, and 2–5 copy databases (called read replicas) handle all the load requests. Your app sends saves to the main one and loads to the copies.` });
+            }
+
+            if (writeRPS > 300) {
+                recs.push({ cls: 'tag-amber', tag: 'WRITE QUEUE', text: `<strong>You have ${fmt(writeRPS)} save requests/sec — your database will get overwhelmed by direct writes.</strong> Add a message queue (Kafka, RabbitMQ, or AWS SQS) in between. Your app drops save requests into the queue, and workers slowly drain it into the database at a safe rate. This prevents crashes and data loss during traffic spikes.` });
+            }
+
+            if (readPct > 0 && writePct > 0 && (readPct + writePct) > 1) {
+                recs.push({ cls: 'tag-coral', tag: 'OVERLAPPING OPS', text: `<strong>Your loads (${Math.round(readPct * 100)}%) + saves (${Math.round(writePct * 100)}%) add up to more than 100%.</strong> This is realistic and correct — it means some user actions both load and save at the same time (e.g. opening a post loads the content and also records a view). Your real database load is ${fmt(readRPS + writeRPS)} ops/sec, which is higher than peak RPS. Make sure your database is sized for this combined number.` });
+            }
+
+            if (totalBytes >= 1e15) {
+                recs.push({ cls: 'tag-red', tag: 'MASSIVE STORAGE', text: `<strong>You need petabytes of storage — no single server can hold this.</strong> Use a distributed storage system like Amazon S3, Google Cloud Storage, or HDFS. Split data into hot (recent, fast SSDs), warm (older, cheaper disks), and cold (archived, cheapest storage). Use Parquet or ORC file formats for any analytics data.` });
+            } else if (totalBytes >= 1e12) {
+                recs.push({ cls: 'tag-coral', tag: 'LARGE STORAGE', text: `<strong>You need terabytes of storage.</strong> Move large files, images, and videos out of your database and into object storage like Amazon S3 or Cloudflare R2. Keep only small metadata (IDs, titles, timestamps) in your database. Set up lifecycle rules to automatically archive old data to cheaper storage tiers.` });
+            } else if (totalBytes >= 1e9) {
+                recs.push({ cls: 'tag-blue', tag: 'STORAGE', text: `<strong>You need gigabytes of storage — very manageable.</strong> A single managed database like AWS RDS or Google Cloud SQL with SSD storage handles this fine. Turn on automated backups and point-in-time recovery so you can roll back to any moment if something goes wrong.` });
+            }
+
+            if (dau > 100000) {
+                recs.push({ cls: 'tag-purple', tag: 'USE A CDN', text: `<strong>With ${fmt(dau)} daily users, do not serve static files from your own server.</strong> A CDN (Content Delivery Network) like Cloudflare, AWS CloudFront, or Fastly stores copies of your images, CSS, and JavaScript on servers all over the world. Users download from the nearest one — pages load faster and your server handles far less traffic.` });
+            }
+
+            if (peakRPS > 100) {
+                recs.push({ cls: 'tag-green', tag: 'MONITORING', text: `<strong>At this scale you need to know what is happening inside your system.</strong> Set up three things: (1) Metrics — count requests/sec, errors, and response time with Prometheus + Grafana. (2) Logs — collect all logs in one place with the ELK stack or Grafana Loki. (3) Traces — follow a single request through your whole system with OpenTelemetry. Set alerts when error rate goes above 1% or response time exceeds 200ms.` });
+            }
+
+            return recs;
+        }
+
+        $('calc-btn').addEventListener('click', () => {
+            const dau = +$('dau').value || 0;
+            const actions = +$('actions').value || 0;
+            const mult = +$('multiplier').value || 1;
+            const readPct = +$('readpct').value / 100;
+            const writePct = +$('writepct').value / 100;
+            const payload = +$('payload').value || 0;
+            const retention = +$('retention').value || 1;
+
+            const totalReqs = dau * actions;
+            const avgRPS = totalReqs / 86400;
+            const peakRPS = avgRPS * mult;
+            const readRPS = peakRPS * readPct;
+            const writeRPS = peakRPS * writePct;
+            const totalDBOps = readRPS + writeRPS;
+            const dailyBytes = totalReqs * payload * 1024;
+            const totalBytes = dailyBytes * retention;
+
+            $('formula-bar').innerHTML =
+                `${dau.toLocaleString()} users &times; ${actions} clicks = <span>${fmt(totalReqs)}</span> requests/day
+       &nbsp;|&nbsp; &divide; 86,400 seconds = <span>${fmt(avgRPS)}</span> avg/sec
+       &nbsp;|&nbsp; &times; ${mult}&times; rush hour = <span style="color:var(--coral)">${fmt(peakRPS)}</span> peak req/sec`;
+
+            $('r-total').textContent = fmt(totalReqs);
+            $('r-avg').textContent = fmt(avgRPS);
+            $('r-peak').textContent = fmt(peakRPS);
+            $('r-mult').textContent = mult + '×';
+
+            $('db-total-ops').textContent = fmt(totalDBOps) + ' ops/sec';
+            $('db-load-note').textContent =
+                (readPct + writePct) > 1
+                    ? `Loads (${fmt(readRPS)}) + Saves (${fmt(writeRPS)}) exceed peak RPS because some actions do both at once. Size your database for ${fmt(totalDBOps)} ops/sec.`
+                    : `Loads (${fmt(readRPS)}) + Saves (${fmt(writeRPS)}) = ${fmt(totalDBOps)} total database operations per second.`;
+
+            $('r-reads').textContent = fmt(readRPS);
+            $('r-writes').textContent = fmt(writeRPS);
+            $('r-reads-explain').textContent = `${Math.round(readPct * 100)}% of peak ${fmt(peakRPS)} req/sec are loading data`;
+            $('r-writes-explain').textContent = `${Math.round(writePct * 100)}% of peak ${fmt(peakRPS)} req/sec are saving data`;
+
+            const maxRW = Math.max(readRPS, writeRPS, 1);
+            $('read-fill').style.width = (readRPS / maxRW * 100) + '%';
+            $('write-fill').style.width = (writeRPS / maxRW * 100) + '%';
+
+            const [ds, du] = fmtStorage(dailyBytes);
+            const [ts, tu] = fmtStorage(totalBytes);
+            $('r-daily-storage').textContent = ds;
+            $('r-daily-unit').textContent = du + ' / day';
+            $('r-total-storage').textContent = ts;
+            $('r-total-unit').textContent = tu + ' over ' + retention + ' days';
+
+            const recs = buildRecs(peakRPS, readPct, writePct, readRPS, writeRPS, dailyBytes, totalBytes, dau);
+            $('r-recs').innerHTML = recs.map(r =>
+                `<div class="rec-row">
+         <span class="rec-tag ${r.cls}">${r.tag}</span>
+         <span class="rec-text">${r.text}</span>
+       </div>`
+            ).join('');
+
+            $('results').classList.remove('hidden');
+            setTimeout(() => $('results').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+        });
+    </script>
+</body>
+
+</html>
